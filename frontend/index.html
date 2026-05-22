@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Research Citation Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
+
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <header class="border-b border-gray-800 pb-6 mb-8 text-center">
+            <h1 class="text-3xl font-extrabold tracking-tight text-indigo-400 mb-2">RAG Research Citation Assistant</h1>
+            <p class="text-gray-400 text-sm">Upload literature libraries and generate cited Related Work summaries instantly.</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="md:col-span-1 space-y-6">
+                <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-md">
+                    <h2 class="text-lg font-bold text-gray-200 mb-4">1. Document Ingestion</h2>
+                    <form id="uploadForm" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Select Research PDF</label>
+                            <input type="file" id="pdfFile" accept=".pdf" required
+                                class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer bg-gray-900 rounded-md border border-gray-700 p-1">
+                        </div>
+                        <button type="submit" id="uploadBtn"
+                            class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold py-2 px-4 rounded-md transition duration-200 shadow">
+                            Upload Paper
+                        </button>
+                    </form>
+                    <div id="uploadStatus" class="mt-3 text-xs font-medium"></div>
+                </div>
+
+                <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-md">
+                    <h2 class="text-lg font-bold text-gray-200 mb-2">Active Library</h2>
+                    <p class="text-xs text-gray-400 mb-3">Papers currently indexed in local storage.</p>
+                    <ul id="papersList" class="space-y-2 max-h-48 overflow-y-auto text-xs divide-y divide-gray-700 pr-1">
+                        </ul>
+                </div>
+            </div>
+
+            <div class="md:col-span-2 space-y-6">
+                <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-md">
+                    <h2 class="text-lg font-bold text-gray-200 mb-4">2. Literature Search & Generation</h2>
+                    <form id="queryForm" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Describe Your Research Focus</label>
+                            <textarea id="queryText" rows="4" required
+                                placeholder="e.g., I am researching transformer architectures for low-resource language translation..."
+                                class="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"></textarea>
+                        </div>
+                        <button type="submit" id="queryBtn"
+                            class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold py-2.5 px-4 rounded-md transition duration-200 shadow">
+                            Generate Citations
+                        </button>
+                    </form>
+                </div>
+
+                <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-md min-h-[200px] flex flex-col justify-between">
+                    <div>
+                        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Generated Related Work</h2>
+                        <div id="outputContainer" class="text-gray-300 text-sm leading-relaxed whitespace-pre-line bg-gray-900 p-4 rounded-lg border border-gray-700 min-h-[120px]">
+                            <span class="text-gray-500 italic">Output will be displayed here once generated...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000";
+
+        // DOM Element Cache
+        const uploadForm = document.getElementById('uploadForm');
+        const pdfFileInput = document.getElementById('pdfFile');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const uploadStatus = document.getElementById('uploadStatus');
+        
+        const queryForm = document.getElementById('queryForm');
+        const queryTextInput = document.getElementById('queryText');
+        const queryBtn = document.getElementById('queryBtn');
+        const outputContainer = document.getElementById('outputContainer');
+        const papersList = document.getElementById('papersList');
+
+        // Fetch and refresh current paper list
+        async function fetchLibraryIndex() {
+            try {
+                const response = await fetch(`${API_BASE}/papers`);
+                if (!response.ok) throw new Error("Failed to load library collection metadata.");
+                const data = await response.json();
+                
+                papersList.innerHTML = "";
+                if (data.uploaded_papers.length === 0) {
+                    papersList.innerHTML = `<li class="text-gray-500 italic p-2">Library is empty.</li>`;
+                    return;
+                }
+
+                data.uploaded_papers.forEach(title => {
+                    const li = document.createElement('li');
+                    li.className = "flex justify-between items-center py-2 text-gray-300 gap-2";
+                    li.innerHTML = `
+                        <span class="truncate font-medium" title="${title}">${title}</span>
+                        <button onclick="deletePaper('${title}')" class="text-red-400 hover:text-red-300 text-[10px] font-bold uppercase tracking-wider bg-red-950/40 border border-red-900/60 px-1.5 py-0.5 rounded transition">
+                            Wipe
+                        </button>
+                    `;
+                    papersList.appendChild(li);
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Handle Paper Upload
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const file = pdfFileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            uploadBtn.disabled = true;
+            uploadBtn.innerText = "Ingesting & Indexing...";
+            uploadStatus.className = "mt-3 text-xs font-medium text-yellow-400";
+            uploadStatus.innerText = "Extracting text and structural vectors...";
+
+            try {
+                const response = await fetch(`${API_BASE}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.detail || "Ingestion pipeline failure.");
+
+                uploadStatus.className = "mt-3 text-xs font-medium text-emerald-400";
+                uploadStatus.innerText = "Document processed and stored.";
+                uploadForm.reset();
+                fetchLibraryIndex();
+            } catch (err) {
+                uploadStatus.className = "mt-3 text-xs font-medium text-red-400";
+                uploadStatus.innerText = err.message;
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.innerText = "Upload Paper";
+            }
+        });
+
+        // Handle Semantic Context Query
+        queryForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const queryValue = queryTextInput.value.trim();
+            if (!queryValue) return;
+
+            queryBtn.disabled = true;
+            queryBtn.innerText = "Querying Vector Index & Synthesizing...";
+            outputContainer.innerHTML = `<span class="text-yellow-400 animate-pulse font-medium">Executing semantic search across stored embeddings... Spawning generative completion loop...</span>`;
+
+            try {
+                const response = await fetch(`${API_BASE}/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: queryValue })
+                });
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.detail || "Generation layer exception.");
+
+                outputContainer.className = "text-gray-200 text-sm leading-relaxed whitespace-pre-line bg-gray-900 p-4 rounded-lg border border-gray-700 min-h-[120px]";
+                outputContainer.innerText = data.result;
+            } catch (err) {
+                outputContainer.innerHTML = `<span class="text-red-400 font-semibold">Error: ${err.message}</span>`;
+            } finally {
+                queryBtn.disabled = false;
+                queryBtn.innerText = "Generate Citations";
+            }
+        });
+
+        // Delete Individual Document Mapping From Storage
+        async function deletePaper(title) {
+            if (!confirm(`Are you sure you want to permanently delete "${title}" from the database disk?`)) return;
+            try {
+                const response = await fetch(`${API_BASE}/paper`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ paper_title: title })
+                });
+                if (!response.ok) throw new Error("Failed to delete records.");
+                fetchLibraryIndex();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        // Initialize view on mount
+        fetchLibraryIndex();
+    </script>
+</body>
+</html>

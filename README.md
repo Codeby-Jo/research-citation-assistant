@@ -1,0 +1,17 @@
+# RAG Research Citation Assistant
+
+A Retrieval-Augmented Generation application that allows academic researchers to upload a library of PDFs and instantly generate cited literature summaries.
+
+## Tech Stack
+- **Backend:** FastAPI, Pydantic
+- **Vector Store:** ChromaDB (Persistent Local Disk)
+- **Embeddings:** Local Sentence-Transformers (`all-MiniLM-L6-v2`)
+- **LLM Synthesis:** OpenRouter API (`openrouter/free` auto-router)
+- **Frontend:** Vanilla HTML5, Tailwind CSS, JavaScript Fetch API
+
+## Fresh Machine Installation Steps
+1. Clone the repository and navigate to the project directory.
+2. Create and activate a virtual environment:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/bin/activate

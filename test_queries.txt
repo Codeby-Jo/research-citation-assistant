@@ -1,0 +1,4 @@
+Query 1: give me multiple linear regression
+
+Query 2: what is dynamic routing
+
