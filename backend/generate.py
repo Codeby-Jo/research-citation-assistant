@@ -48,7 +48,7 @@ def generate_related_work(query: str, retrieved_chunks: list) -> str:
     try:
         # Utilizing OpenRouter's free automated model router tag
         response = client.chat.completions.create(
-            model="openrouter/free", 
+            model=os.environ.get("LLM_MODEL", "meta-llama/llama-3.1-8b-instruct:free"),, 
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}

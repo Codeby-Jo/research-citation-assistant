@@ -98,14 +98,21 @@
                 }
 
                 data.uploaded_papers.forEach(title => {
-                    const li = document.createElement('li');
+                    const li = document.createElement("li");
                     li.className = "flex justify-between items-center py-2 text-gray-300 gap-2";
-                    li.innerHTML = `
-                        <span class="truncate font-medium" title="${title}">${title}</span>
-                        <button onclick="deletePaper('${title}')" class="text-red-400 hover:text-red-300 text-[10px] font-bold uppercase tracking-wider bg-red-950/40 border border-red-900/60 px-1.5 py-0.5 rounded transition">
-                            Wipe
-                        </button>
-                    `;
+
+                    const span = document.createElement("span");
+                    span.className = "truncate font-medium";
+                    span.title = title;
+                    span.textContent = title; // ✅ Safe: treated strictly as text string data
+
+                    const btn = document.createElement("button");
+                    btn.className = "text-red-400 hover:text-red-500 transition-colors"; 
+                    btn.textContent = "Wipe";
+                    btn.addEventListener("click", () => deletePaper(title)); // ✅ Safe: direct functional callback
+
+                    li.appendChild(span);
+                    li.appendChild(btn);
                     papersList.appendChild(li);
                 });
             } catch (err) {
