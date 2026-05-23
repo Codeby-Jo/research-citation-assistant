@@ -93,26 +93,38 @@
                 
                 papersList.innerHTML = "";
                 if (data.uploaded_papers.length === 0) {
-                    papersList.innerHTML = `<li class="text-gray-500 italic p-2">Library is empty.</li>`;
+                    papersList.innerHTML = `<li class="text-gray-500 italic p-2 text-sm">Library is empty.</li>`;
                     return;
                 }
 
-                data.uploaded_papers.forEach(title => {
+                // --- UPGRADE 1: DISPLAY EXTRACTED ACADEMIC METADATA ---
+                data.uploaded_papers.forEach(paper => {
                     const li = document.createElement("li");
-                    li.className = "flex justify-between items-center py-2 text-gray-300 gap-2";
+                    li.className = "flex flex-col p-2.5 bg-gray-800/40 rounded mb-2 border border-gray-700/40 gap-1";
+
+                    const fileRow = document.createElement("div");
+                    fileRow.className = "flex justify-between items-center gap-2 w-full";
 
                     const span = document.createElement("span");
-                    span.className = "truncate font-medium";
-                    span.title = title;
-                    span.textContent = title; // ✅ Safe: treated strictly as text string data
+                    span.className = "truncate font-medium text-sm text-gray-200";
+                    span.title = paper.title; // Displays full paper title on hover
+                    span.textContent = paper.filename; 
 
                     const btn = document.createElement("button");
-                    btn.className = "text-red-400 hover:text-red-500 transition-colors"; 
+                    btn.className = "text-red-400 hover:text-red-500 text-xs transition-colors font-medium"; 
                     btn.textContent = "Wipe";
-                    btn.addEventListener("click", () => deletePaper(title)); // ✅ Safe: direct functional callback
+                    btn.addEventListener("click", () => deletePaper(paper.filename)); 
 
-                    li.appendChild(span);
-                    li.appendChild(btn);
+                    fileRow.appendChild(span);
+                    fileRow.appendChild(btn);
+
+                    // Secondary layout line rendering the specific author and publishing year metadata
+                    const metaSpan = document.createElement("span");
+                    metaSpan.className = "text-[11px] text-gray-400 italic truncate";
+                    metaSpan.textContent = `${paper.author} (${paper.year})`;
+
+                    li.appendChild(fileRow);
+                    li.appendChild(metaSpan);
                     papersList.appendChild(li);
                 });
             } catch (err) {
@@ -141,6 +153,10 @@
                 });
                 const data = await response.json();
 
+                // --- UPGRADE 3: HANDLE 409 DUPLICATE DETECTIONS ---
+                if (response.status === 409) {
+                    throw new Error(`⚠️ Duplicate Blocked: ${data.detail}`);
+                }
                 if (!response.ok) throw new Error(data.detail || "Ingestion pipeline failure.");
 
                 uploadStatus.className = "mt-3 text-xs font-medium text-emerald-400";
@@ -176,8 +192,50 @@
 
                 if (!response.ok) throw new Error(data.detail || "Generation layer exception.");
 
-                outputContainer.className = "text-gray-200 text-sm leading-relaxed whitespace-pre-line bg-gray-900 p-4 rounded-lg border border-gray-700 min-h-[120px]";
-                outputContainer.innerText = data.result;
+                // Initialize container layout properties cleanly using a flex arrangement
+                outputContainer.className = "text-gray-200 text-sm leading-relaxed whitespace-pre-line bg-gray-900 p-4 rounded-lg border border-gray-700 min-h-[120px] flex flex-col gap-4";
+                outputContainer.innerHTML = "";
+
+                // Inject primary text generation response (or the relevance threshold fallback alert string)
+                const summaryDiv = document.createElement("div");
+                summaryDiv.innerText = data.result;
+                outputContainer.appendChild(summaryDiv);
+
+                // --- UPGRADE 4: RENDER SECTION LABELS ON EVIDENCE CHUNKS ---
+                if (data.context_chunks && data.context_chunks.length > 0) {
+                    const separator = document.createElement("div");
+                    separator.className = "border-t border-gray-700/60 pt-3 mt-1 text-[11px] font-bold text-gray-400 uppercase tracking-wider";
+                    separator.textContent = "Retrieved Evidence Segments:";
+                    outputContainer.appendChild(separator);
+
+                    data.context_chunks.forEach(chunk => {
+                        const chunkBlock = document.createElement("div");
+                        chunkBlock.className = "p-3 bg-gray-950/40 border border-gray-800/80 rounded flex flex-col gap-1.5";
+
+                        const headerRow = document.createElement("div");
+                        headerRow.className = "flex items-center gap-2 flex-wrap";
+
+                        // Create structural section marker badges
+                        const badge = document.createElement("span");
+                        badge.className = "bg-blue-900/40 text-blue-300 border border-blue-700/30 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide";
+                        badge.textContent = chunk.metadata.section || "unknown";
+
+                        const originText = document.createElement("span");
+                        originText.className = "text-[11px] text-gray-500 truncate max-w-xs";
+                        originText.textContent = `from file: ${chunk.metadata.paper_title}`;
+
+                        headerRow.appendChild(badge);
+                        headerRow.appendChild(originText);
+
+                        const textParagraph = document.createElement("p");
+                        textParagraph.className = "text-gray-400 text-[11px] leading-relaxed italic";
+                        textParagraph.textContent = `"${chunk.text}"`;
+
+                        chunkBlock.appendChild(headerRow);
+                        chunkBlock.appendChild(textParagraph);
+                        outputContainer.appendChild(chunkBlock);
+                    });
+                }
             } catch (err) {
                 outputContainer.innerHTML = `<span class="text-red-400 font-semibold">Error: ${err.message}</span>`;
             } finally {
@@ -204,6 +262,6 @@
 
         // Initialize view on mount
         fetchLibraryIndex();
-    </script>
+</script>
 </body>
 </html>

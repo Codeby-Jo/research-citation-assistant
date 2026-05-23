@@ -24,31 +24,55 @@ def get_embedding(text: str) -> list:
         raise e
 
 def generate_related_work(query: str, retrieved_chunks: list) -> str:
-    """Compiles chunks and requests synthesis from a free OpenRouter model."""
+    """
+    Upgrade 1 & 4 Generation Block: Compiles context text along with academic 
+    metadata boundaries to synthesize structured inline citations.
+    """
     context_block = ""
     for idx, chunk in enumerate(retrieved_chunks):
-        title = chunk.get("metadata", {}).get("paper_title", "Unknown Document")
+        metadata = chunk.get("metadata", {})
+        
+        # Extract rich metadata tracking payloads with safe structural fallbacks
+        filename = metadata.get("paper_title", "Unknown Document")
+        title = metadata.get("extracted_title", filename)
+        author = metadata.get("author", "Unknown Author")
+        year = metadata.get("year", "Unknown Year")
+        section = metadata.get("section", "unknown section")
+        
         text = chunk.get("text", "")
-        context_block += f"[Source {idx+1}: {title}]\n{text}\n\n"
+        
+        # Construct a highly visible data payload for the LLM to process
+        context_block += (
+            f"[Source {idx+1}]\n"
+            f"Filename: {filename}\n"
+            f"Extracted Title: {title}\n"
+            f"Author/s: {author}\n"
+            f"Year: {year}\n"
+            f"Document Section: {section}\n"
+            f"Content: {text}\n\n"
+        )
 
     system_prompt = (
         "You are an elite academic research citation assistant.\n"
-        "Your task is to draft a 2-3 paragraph 'Related Work' or 'Literature Review' summary "
+        "Your task is to draft a clean, professional 2-3 paragraph 'Related Work' or 'Literature Review' summary "
         "addressing the user's research topic based exclusively on the provided source texts.\n\n"
-        "UNBREAKABLE CONSTRAINTS:\n"
-        "1. Synthesize the findings into a cohesive narrative. Do not just list the papers.\n"
-        "2. You must cite source papers directly by their exact titles inline when referencing their work.\n"
-        "3. Absolutely NO external knowledge or fabrication. Only cite papers that appear in the text below.\n"
-        "4. If the provided documents are completely unrelated to the topic, state clearly that no relevant "
-        "literature was found in the provided library."
+        "UNBREAKABLE CITATION CONSTRAINTS:\n"
+        "1. Synthesize the findings into a fluid academic narrative. Do not just list or summarize papers one by one.\n"
+        "2. MANDATORY CITATION FORMAT: You must cite source papers inline using exactly this format: (Author et al., Year - Paper Title).\n"
+        "   - Example: 'Prior work on attention mechanisms (Vaswani et al., 2017 - Attention Is All You Need) demonstrated...'\n"
+        "3. CRITICAL: Never use filenames (e.g., 'BIG DATA.pdf') as citations. Use the provided Extracted Title, Author/s, and Year attributes.\n"
+        "4. Absolutely NO external knowledge lookup or fabrication. Only reference facts and papers that appear explicitly in the text block below.\n"
+        "5. If the provided documents are completely unrelated to the topic, state clearly that no relevant literature was found in the provided library."
     )
 
     user_prompt = f"User Research Topic: {query}\n\nRetrieved Source Texts:\n{context_block}"
 
     try:
-        # Utilizing OpenRouter's free automated model router tag
+        # Resolves the stable model ID dynamically from your environment configuration
+        selected_model = os.environ.get("LLM_MODEL", "meta-llama/llama-3.1-8b-instruct:free")
+        
         response = client.chat.completions.create(
-            model=os.environ.get("LLM_MODEL", "meta-llama/llama-3.1-8b-instruct:free"),, 
+            model=selected_model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
