@@ -71,9 +71,9 @@
 
     <script>
         // --- FIX 3: ELIMINATE HARDCODED LOCALHOST URL ---
-        const API_BASE = window.location.origin === "http://127.0.0.1:5500" 
-            ? "http://127.0.0.1:8000"  // Automatic configuration for local VS Code Live Server dev
-            : window.location.origin;  // Dynamic production relative resolution origin fallback
+        const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+            ? "http://127.0.0.1:8000"
+            : `${window.location.protocol}//${window.location.host}`;
 
         // DOM Element Cache
         const uploadForm = document.getElementById('uploadForm');
@@ -95,7 +95,7 @@
                 const data = await response.json();
                 
                 papersList.innerHTML = "";
-                if (data.uploaded_papers.length === 0) {
+                if (!data.uploaded_papers || data.uploaded_papers.length === 0) {
                     papersList.innerHTML = `<li class="text-gray-500 italic p-2 text-sm">Library is empty.</li>`;
                     return;
                 }
@@ -114,7 +114,7 @@
                     span.textContent = paper.filename; 
 
                     const btn = document.createElement("button");
-                    btn.className = "text-red-400 hover:text-red-500 text-xs transition-colors font-medium"; 
+                    btn.className = "text-red-400 hover:text-red-500 text-xs transition-colors font-medium cursor-pointer"; 
                     btn.textContent = "Wipe";
                     btn.addEventListener("click", () => deletePaper(paper.filename)); 
 
@@ -132,6 +132,7 @@
                 });
             } catch (err) {
                 console.error(err);
+                papersList.innerHTML = `<li class="text-red-400 italic p-2 text-xs">Error connecting to server index.</li>`;
             }
         }
 
@@ -201,7 +202,7 @@
 
                 // Inject primary text generation response (or the relevance threshold fallback alert string)
                 const summaryDiv = document.createElement("div");
-                summaryDiv.innerText = data.result;
+                summaryDiv.textContent = data.result; // ✅ Switched to textContent for seamless layout performance
                 outputContainer.appendChild(summaryDiv);
 
                 // RENDER SECTION LABELS ON EVIDENCE CHUNKS
@@ -243,7 +244,7 @@
                 // --- FIX 1: PATCH XSS VULNERABILITY IN QUERY ERROR HANDLER ---
                 const errSpan = document.createElement("span");
                 errSpan.className = "text-red-400 font-semibold";
-                errSpan.textContent = `Error: ${err.message}`; // Safely bindings data values into plain layout strings
+                errSpan.textContent = `Error: Internal Server Error during query inference: ${err.message}`;
 
                 outputContainer.innerHTML = ""; // Wipes container bindings cleanly
                 outputContainer.appendChild(errSpan); // Safe node appends parsing execution prevention
@@ -271,6 +272,6 @@
 
         // Initialize view on mount
         fetchLibraryIndex();
-</script>
+    </script>
 </body>
 </html>

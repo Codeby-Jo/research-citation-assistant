@@ -2,17 +2,25 @@ import os
 import re
 import shutil
 import logging
+from dotenv import load_dotenv  # 👈 Added for environment configuration alignment
+
+# 🔥 FORCE GLOBAL PATH RESOLUTION BEFORE ANY LOCAL IMPORTS RUN
+# Calculates the absolute path to the project root folder where your .env lives
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+dotenv_path = os.path.join(BASE_DIR, '.env')
+load_dotenv(dotenv_path)
+
+# Standard library framework injections
 from fastapi import FastAPI, UploadFile, File, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-# Import our custom modules
+# Import our custom modules (Now perfectly safe because keys are already in memory!)
 from database import get_or_create_collection
 from ingest import extract_text_from_pdf, chunk_text
 from generate import get_embedding, generate_related_work
 
 # --- CODE HYGIENE UPGRADE: CONFIGURE SYSTEM LOGGING ---
-# Replacing basic stdout dumping with a proper structured environment logger
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",

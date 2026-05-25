@@ -2,21 +2,32 @@ import os
 import logging
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv
 
-# --- CODE HYGIENE UPGRADE: CONFIGURE LOGGER INTERFACE ---
-# Establishes structural tracking inside the file stream instead of dropping unlogged stdout lines
+# --- CODE HYGIENE UPGRADE: CONFIGURE MODULE-LEVEL LOGGER INTERFACE ---
 logger = logging.getLogger(__name__)
 
-# 1. Keep your free local text embeddings intact
+# 🔥 FIX 1: BULLETPROOF PATHING - Locates the .env file dynamically in the project root folder
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+dotenv_path = os.path.join(BASE_DIR, '.env')
+load_dotenv(dotenv_path)
+
+# 🔥 FIX 2: MODEL INITIALIZATION - Loads the local embedding architecture into system memory
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
-# 2. Re-point the client to the global OpenRouter gateway
-# --- FIX 4: REMOVED HARDCODED VS CODE LIVE SERVER PORT DEV ARTIFACT ---
+# Retrieve the API key string from the environment
+api_key = os.environ.get("OPENAI_API_KEY")
+
+# Safety guard checking to make sure your keys loaded cleanly
+if not api_key:
+    logger.warning("⚠️ OPENAI_API_KEY is empty! Double-check that your '.env' file position is correct.")
+
+# Initialize OpenAI client by explicitly assigning the loaded key string
 client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY"),
+    api_key=api_key,
     base_url="https://openrouter.ai/api/v1",
     default_headers={
-        "X-OpenRouter-Title": "RAG Citation Assistant"
+        "X-OpenRouter-Title": "RAG Research Citation Assistant"
     }
 )
 
@@ -26,7 +37,7 @@ def get_embedding(text: str) -> list:
         return embedding_model.encode(text).tolist()
     except Exception as e:
         # --- FIX 4: UPGRADED DEBUG PRINT TO STRUCTURED LOGGING ---
-        logging.error(f"Error generating local embedding: {e}", exc_info=True)
+        logger.error(f"Error generating local embedding layer: {str(e)}", exc_info=True)
         raise e
 
 def generate_related_work(query: str, retrieved_chunks: list) -> str:
@@ -74,8 +85,8 @@ def generate_related_work(query: str, retrieved_chunks: list) -> str:
     user_prompt = f"User Research Topic: {query}\n\nRetrieved Source Texts:\n{context_block}"
 
     try:
-        # Resolves the stable model ID dynamically from your environment configuration
-        selected_model = os.environ.get("LLM_MODEL", "meta-llama/llama-3.1-8b-instruct:free")
+        # 🔥 FIX 3: OPENROUTER 404 RESOLUTION - Uses the stable, global free routing slug
+        selected_model = os.environ.get("LLM_MODEL", "openrouter/free")
         
         response = client.chat.completions.create(
             model=selected_model,
@@ -88,5 +99,5 @@ def generate_related_work(query: str, retrieved_chunks: list) -> str:
         return response.choices[0].message.content
     except Exception as e:
         # --- FIX 4: UPGRADED DEBUG PRINT TO STRUCTURED LOGGING ---
-        logging.error(f"Error during OpenRouter text generation: {e}", exc_info=True)
+        logger.error(f"Error during OpenRouter text generation inference sequence: {str(e)}", exc_info=True)
         raise e

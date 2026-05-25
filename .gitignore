@@ -1,5 +1,14 @@
-venv/
-__pycache__/
+# Ignore environment credential files
 .env
+.env.local
+
+# Ignore Python virtual environments
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Ignore local database states and uploaded papers
+backend/__pycache__/
 data/
 uploaded_papers/
