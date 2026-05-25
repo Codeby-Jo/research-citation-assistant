@@ -1,16 +1,21 @@
 import os
+import logging
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
+
+# --- CODE HYGIENE UPGRADE: CONFIGURE LOGGER INTERFACE ---
+# Establishes structural tracking inside the file stream instead of dropping unlogged stdout lines
+logger = logging.getLogger(__name__)
 
 # 1. Keep your free local text embeddings intact
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # 2. Re-point the client to the global OpenRouter gateway
+# --- FIX 4: REMOVED HARDCODED VS CODE LIVE SERVER PORT DEV ARTIFACT ---
 client = OpenAI(
     api_key=os.environ.get("OPENAI_API_KEY"),
     base_url="https://openrouter.ai/api/v1",
     default_headers={
-        "HTTP-Referer": "http://127.0.0.1:5500", # Helps OpenRouter track app performance
         "X-OpenRouter-Title": "RAG Citation Assistant"
     }
 )
@@ -20,7 +25,8 @@ def get_embedding(text: str) -> list:
     try:
         return embedding_model.encode(text).tolist()
     except Exception as e:
-        print(f"Error generating local embedding: {e}")
+        # --- FIX 4: UPGRADED DEBUG PRINT TO STRUCTURED LOGGING ---
+        logging.error(f"Error generating local embedding: {e}", exc_info=True)
         raise e
 
 def generate_related_work(query: str, retrieved_chunks: list) -> str:
@@ -81,5 +87,6 @@ def generate_related_work(query: str, retrieved_chunks: list) -> str:
         )
         return response.choices[0].message.content
     except Exception as e:
-        print(f"Error during OpenRouter text generation: {e}")
+        # --- FIX 4: UPGRADED DEBUG PRINT TO STRUCTURED LOGGING ---
+        logging.error(f"Error during OpenRouter text generation: {e}", exc_info=True)
         raise e

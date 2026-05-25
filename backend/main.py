@@ -1,6 +1,7 @@
 import os
 import re
 import shutil
+import logging
 from fastapi import FastAPI, UploadFile, File, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -9,6 +10,14 @@ from pydantic import BaseModel, Field
 from database import get_or_create_collection
 from ingest import extract_text_from_pdf, chunk_text
 from generate import get_embedding, generate_related_work
+
+# --- CODE HYGIENE UPGRADE: CONFIGURE SYSTEM LOGGING ---
+# Replacing basic stdout dumping with a proper structured environment logger
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
 
 app = FastAPI(
     title="RAG Research Citation Assistant - V2",
@@ -127,6 +136,7 @@ async def upload_paper(file: UploadFile = File(...)):
     collection = get_or_create_collection()
     existing_check = collection.get(where={"paper_title": file.filename}, limit=1)
     if existing_check and existing_check.get("ids"):
+        logging.warning(f"Duplicate upload blocked for filename: '{file.filename}'")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="This paper has already been uploaded. Delete it first if you want to re-index it."
@@ -181,6 +191,7 @@ async def upload_paper(file: UploadFile = File(...)):
             documents=documents
         )
 
+        logging.info(f"Successfully processed and indexed unique document: '{file.filename}'")
         return {
             "message": f"Successfully processed '{file.filename}'.",
             "metadata": {"title": extracted_title, "author": extracted_authors, "year": extracted_year}
@@ -189,6 +200,8 @@ async def upload_paper(file: UploadFile = File(...)):
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
+        # --- FIX 4: TRACK ERRORS WITH STRUCTURAL BACKEND LOGGING ---
+        logging.error(f"Internal Ingestion Pipeline Failure for '{file.filename}': {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal Server Error during ingestion: {str(e)}"
@@ -234,6 +247,7 @@ async def query_library(request: QueryRequest):
 
         # Return a clear message if no content satisfies the similarity criteria
         if not retrieved_chunks:
+            logging.info(f"Query interception: No document chunks fell below the threshold of {distance_threshold}")
             return {
                 "query": request.query,
                 "result": "No sufficiently relevant papers were found in your library for this query."
@@ -249,6 +263,8 @@ async def query_library(request: QueryRequest):
         }
 
     except Exception as e:
+        # --- FIX 4: TRACK ERRORS WITH STRUCTURAL BACKEND LOGGING ---
+        logging.error(f"Internal Query Execution Failure for query '{request.query}': {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal Server Error during query inference: {str(e)}"
@@ -279,6 +295,8 @@ async def list_papers():
 
         return {"uploaded_papers": list(papers_dict.values())}
     except Exception as e:
+        # --- FIX 4: TRACK ERRORS WITH STRUCTURAL BACKEND LOGGING ---
+        logging.error(f"Failed to fetch paper library index catalog: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch paper library index: {str(e)}"
@@ -293,8 +311,11 @@ async def delete_paper(request: DeleteRequest):
     try:
         collection = get_or_create_collection()
         collection.delete(where={"paper_title": request.paper_title})
+        logging.info(f"Permanently cleared all referenced data chunks for: '{request.paper_title}'")
         return {"message": f"Successfully deleted '{request.paper_title}' and flushed references from disk storage."}
     except Exception as e:
+        # --- FIX 4: TRACK ERRORS WITH STRUCTURAL BACKEND LOGGING ---
+        logging.error(f"Failed to delete specified vector data index for '{request.paper_title}': {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete specified data index: {str(e)}"

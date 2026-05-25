@@ -70,7 +70,10 @@
     </div>
 
     <script>
-        const API_BASE = "http://127.0.0.1:8000";
+        // --- FIX 3: ELIMINATE HARDCODED LOCALHOST URL ---
+        const API_BASE = window.location.origin === "http://127.0.0.1:5500" 
+            ? "http://127.0.0.1:8000"  // Automatic configuration for local VS Code Live Server dev
+            : window.location.origin;  // Dynamic production relative resolution origin fallback
 
         // DOM Element Cache
         const uploadForm = document.getElementById('uploadForm');
@@ -97,7 +100,7 @@
                     return;
                 }
 
-                // --- UPGRADE 1: DISPLAY EXTRACTED ACADEMIC METADATA ---
+                // DISPLAY EXTRACTED ACADEMIC METADATA
                 data.uploaded_papers.forEach(paper => {
                     const li = document.createElement("li");
                     li.className = "flex flex-col p-2.5 bg-gray-800/40 rounded mb-2 border border-gray-700/40 gap-1";
@@ -153,7 +156,7 @@
                 });
                 const data = await response.json();
 
-                // --- UPGRADE 3: HANDLE 409 DUPLICATE DETECTIONS ---
+                // HANDLE 409 DUPLICATE DETECTIONS
                 if (response.status === 409) {
                     throw new Error(`⚠️ Duplicate Blocked: ${data.detail}`);
                 }
@@ -201,7 +204,7 @@
                 summaryDiv.innerText = data.result;
                 outputContainer.appendChild(summaryDiv);
 
-                // --- UPGRADE 4: RENDER SECTION LABELS ON EVIDENCE CHUNKS ---
+                // RENDER SECTION LABELS ON EVIDENCE CHUNKS
                 if (data.context_chunks && data.context_chunks.length > 0) {
                     const separator = document.createElement("div");
                     separator.className = "border-t border-gray-700/60 pt-3 mt-1 text-[11px] font-bold text-gray-400 uppercase tracking-wider";
@@ -237,7 +240,13 @@
                     });
                 }
             } catch (err) {
-                outputContainer.innerHTML = `<span class="text-red-400 font-semibold">Error: ${err.message}</span>`;
+                // --- FIX 1: PATCH XSS VULNERABILITY IN QUERY ERROR HANDLER ---
+                const errSpan = document.createElement("span");
+                errSpan.className = "text-red-400 font-semibold";
+                errSpan.textContent = `Error: ${err.message}`; // Safely bindings data values into plain layout strings
+
+                outputContainer.innerHTML = ""; // Wipes container bindings cleanly
+                outputContainer.appendChild(errSpan); // Safe node appends parsing execution prevention
             } finally {
                 queryBtn.disabled = false;
                 queryBtn.innerText = "Generate Citations";
@@ -254,7 +263,7 @@
                     body: JSON.stringify({ paper_title: title })
                 });
                 if (!response.ok) throw new Error("Failed to delete records.");
-                fetchLibraryIndex();
+                fetchLibraryIndex();    
             } catch (err) {
                 alert(err.message);
             }
