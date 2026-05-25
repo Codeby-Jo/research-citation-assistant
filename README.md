@@ -23,4 +23,4 @@ Create a `.env` file in the root directory of your project space and specify the
 ```text
 OPENAI_API_KEY="your_secret_openrouter_api_key_here"
 LLM_MODEL="openrouter/free"
-RELEVANCE_THRESHOLD=1.5
+RELEVANCE_THRESHOLD=0.7
